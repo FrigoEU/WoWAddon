@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "typescript": "3.8.3",
+    "typescript-to-lua": "0.32.2",
+    "@wartoshika/wow-declarations": "v8.3.0-release.1"
+  },
+  "scripts": {
+    "build": "tstl",
+    "deploy": "copy /Y TestAddon.lua \"C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\addOns\\TestAddon\\TestAddon.lua\" && copy /Y TestAddon.xml \"C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\addOns\\TestAddon\\TestAddon.xml\" && copy /Y TestAddon.toc \"C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\addOns\\TestAddon\\TestAddon.toc\""
+  }
+}

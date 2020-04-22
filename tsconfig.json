@@ -1,0 +1,14 @@
+{
+  "tstl": {
+    "luaTarget": "5.1"
+  },
+  "compilerOptions": {
+    "target": "esnext",
+    "lib": ["esnext"],
+    "strict": true,
+        "typeRoots": [
+            "./node_modules/@types",
+            "./node_modules/@wartoshika/wow-declarations"
+        ]
+    }
+}

@@ -2,7 +2,8 @@
   "dependencies": {
     "typescript": "3.8.3",
     "typescript-to-lua": "0.32.2",
-    "@wartoshika/wow-declarations": "v8.3.0-release.1"
+    "@wartoshika/wow-declarations": "v8.3.0-release.1",
+    "typescript-tstl-plugin": "0.1.0"
   },
   "scripts": {
     "build": "tstl",

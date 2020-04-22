@@ -5,6 +5,7 @@
   "compilerOptions": {
     "target": "esnext",
     "lib": ["esnext"],
+    "plugins": [{ "name": "typescript-tstl-plugin" }],
     "strict": true,
         "typeRoots": [
             "./node_modules/@types",

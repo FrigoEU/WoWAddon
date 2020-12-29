@@ -7,9 +7,9 @@
     "lib": ["esnext"],
     "plugins": [{ "name": "typescript-tstl-plugin" }],
     "strict": true,
-        "typeRoots": [
-            "./node_modules/@types",
-            "./node_modules/@wartoshika/wow-declarations"
-        ]
+    "typeRoots": [
+        "./node_modules/@types",
+        "./node_modules/@wartoshika/wow-declarations"
+    ]
     }
 }

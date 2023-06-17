@@ -7,7 +7,9 @@
     "lib": ["esnext"],
     "plugins": [{ "name": "typescript-tstl-plugin" }],
     "strict": true,
+    "types": ["language-extensions"],
     "typeRoots": [
+        "./node_modules/@typescript-to-lua",
         "./node_modules/@types",
         "./node_modules/@wartoshika/wow-declarations"
     ]

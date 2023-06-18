@@ -1,9 +1,11 @@
 /** @NoSelfInFile */
 
 import {
+  CLASSES,
   Frame,
   Texture,
   UnitId,
+  UnitRoleType,
 } from "./node_modules/@wartoshika/wow-declarations/declarations/index";
 
 declare const C_NamePlate: {
@@ -35,6 +37,7 @@ declare const GetInspectSpecialization: (
   this: void,
   u: UnitId
 ) => SpecializationId;
+
 declare function GetSpecializationInfoByID(
   this: void,
   id: SpecializationId
@@ -43,27 +46,40 @@ declare function GetSpecializationInfoByID(
     SpecializationId,
     /* name */ string,
     /* description */ string,
-    /* icon */ FileDataId
+    /* icon */ FileDataId,
+    UnitRoleType,
+    CLASSES
   ]
 >;
+declare function GetClassColor(
+  englishClass: CLASSES
+): LuaMultiReturn<[number, number, number, string]>;
 declare const _G: { [prop: string]: any };
 
 type unit = "player" | "party1" | "party2";
 type tar = "arena1" | "arena2" | "arena3";
 
 const isDrawTest = false;
+const debugging = false;
+const drawMode: "icon" | "color" = "color";
 
 const myFrame = CreateFrame("Frame");
 
+function debug(s: string) {
+  if (debugging) {
+    print(s);
+  }
+}
+
 myFrame.HookScript("OnEvent", function () {
-  print("Setting friendly nameplate size");
+  debug("Setting friendly nameplate size");
   C_NamePlate.SetNamePlateFriendlySize(50, 100);
 });
 myFrame.RegisterEvent("PLAYER_LOGIN");
 
 // Arena target icons
 const iconSize = 25;
-const offsetX = iconSize / 5;
+const iconOffsetX = iconSize / 5;
 const frames = {
   player: makeArenaTargetFrames("player"),
   party1: makeArenaTargetFrames("party1"),
@@ -77,32 +93,58 @@ type partyIconFrame = {
 
 type opponent = {
   specIcon: FileDataId;
+  role: UnitRoleType;
+  class: CLASSES;
+  classColor: [number, number, number];
   tar: tar;
 };
 let opponents: opponent[] = [];
 
 function makeArenaTargetFrames(unit: unit): partyIconFrame[] {
   return [
-    makeArenaTargetFrame(unit, -offsetX),
-    makeArenaTargetFrame(unit, -iconSize - offsetX * 2),
-    makeArenaTargetFrame(unit, -iconSize * 2 - offsetX * 3),
+    makeArenaTargetFrame(unit, 0),
+    makeArenaTargetFrame(unit, 1),
+    makeArenaTargetFrame(unit, 2),
   ];
 }
 
-function makeArenaTargetFrame(unit: unit, offsetX: number): partyIconFrame {
-  const f = CreateFrame("Frame") as Frame & { icon: Texture };
-  f.SetWidth(iconSize);
-  f.SetHeight(iconSize);
+function makeArenaTargetFrame(unit: unit, index: 0 | 1 | 2): partyIconFrame {
+  const offsetX =
+    index === 0
+      ? -iconOffsetX
+      : index == 1
+      ? -iconSize - iconOffsetX * 2
+      : -iconSize * 2 - iconOffsetX * 3;
+  const f =
+    drawMode === "icon"
+      ? (CreateFrame("Frame") as Frame & { icon: Texture })
+      : (CreateFrame(
+          "Frame",
+          undefined,
+          UIParent,
+          "TooltipBorderedFrameTemplate"
+          // "ThinBorderTemplate"
+          // "UIPanelButtonTemplate"
+        ) as Frame & { icon: Texture });
 
   f.icon = f.CreateTexture(
     "arena_targetter_" + unit + "_" + offsetX.toString(),
     "BACKGROUND"
   );
-  f.icon.SetWidth(iconSize);
-  f.icon.SetHeight(iconSize);
+  if (drawMode === "icon") {
+    f.SetWidth(iconSize);
+    f.SetHeight(iconSize);
+    f.icon.SetWidth(iconSize);
+    f.icon.SetHeight(iconSize);
+  } else {
+    f.SetWidth(iconSize + 4);
+    f.SetHeight(iconSize + 4);
+    f.icon.SetWidth(iconSize);
+    f.icon.SetHeight(iconSize);
+  }
   f.icon.SetPoint("CENTER", 0, 0);
 
-  f.icon.SetTexture("Interface\\Icons\\INV_Misc_EngGizmos_17");
+  // f.icon.SetTexture("Interface\\Icons\\INV_Misc_EngGizmos_17");
 
   f.Hide();
 
@@ -114,14 +156,48 @@ function makeArenaTargetFrame(unit: unit, offsetX: number): partyIconFrame {
       waitForFrame(
         frameName,
         function (container) {
-          f.SetPoint("RIGHT", container, "RIGHT", offsetX, 0);
+          f.SetPoint("LEFT", container, "LEFT", -1 * offsetX, 0);
         },
         function () {
-          print("Stopped waiting for frame " + frameName);
+          debug("Stopped waiting for frame " + frameName);
         }
       );
     },
   };
+}
+
+function draw(f: partyIconFrame, opp: opponent): void {
+  if (drawMode === "icon") {
+    drawIcon();
+  } else {
+    drawColor();
+  }
+
+  function drawIcon() {
+    const icon =
+      opp.specIcon ||
+      ("Interface\\Icons\\INV_Misc_EngGizmos_17" as unknown as FileDataId); // temp
+    f.frame.icon.SetTexture(icon);
+  }
+
+  function drawColor() {
+    f.frame.icon.SetColorTexture(
+      opp.classColor[0],
+      opp.classColor[1],
+      opp.classColor[2]
+    );
+
+    // f.frame.SetBackdrop({
+    //   edgeFile: "edgeFile",
+    //   // tile = false,
+    //   // tileEdge = false,
+    //   // tileSize = 0,
+    //   edgeSize: 32,
+    //   insets: { left: 0, right: 0, top: 0, bottom: 0 },
+    // });
+  }
+
+  f.frame.Show();
 }
 
 const allUnits: unit[] = ["player", "party1", "party2"];
@@ -158,7 +234,7 @@ C_Timer.NewTicker(updateInterval, function () {
     const target = UnitGUID((tar + "target") as UnitId);
 
     if (target !== null) {
-      print(tar + " is targetting " + target);
+      debug(tar + " is targetting " + target);
       forEach(allUnits, (unit) => {
         if (target === unitGuids[unit]) {
           targetted_by[unit].push(tar);
@@ -172,7 +248,7 @@ C_Timer.NewTicker(updateInterval, function () {
     const prevDigest = prevDigests[unit];
     const digest = join(unit_being_targetted_by);
     if (prevDigest !== digest) {
-      print("Redrawing " + unit + " - " + digest);
+      debug("Redrawing " + unit + " - " + digest);
       redraw(unit, unit_being_targetted_by);
       prevDigests[unit] = digest;
     }
@@ -196,12 +272,10 @@ function redraw(unit: unit, targetted_by: tar[]) {
     if (!opp) {
       return;
     }
-    const icon =
-      opp.specIcon ||
-      ("Interface\\Icons\\INV_Misc_EngGizmos_17" as unknown as FileDataId); // temp
-    fs[i].frame.icon.SetTexture(icon);
-    fs[i].frame.Show();
-    i++;
+    if (opp.role !== "HEALER") {
+      draw(fs[i], opp);
+      i++;
+    }
   });
 }
 
@@ -212,7 +286,7 @@ initFrame.HookScript("OnEvent", init);
 init();
 
 function init() {
-  print("Initting");
+  debug("Initting");
   const [isArena, _] = IsActiveBattlefieldArena();
   if (!isArena && !isDrawTest) {
     return;
@@ -233,14 +307,26 @@ function initOpponent(tar: tar): opponent {
     tar === "arena1" ? 1 : tar === "arena2" ? 2 : 3
   );
   let specIcon: FileDataId;
+  let classColorOut: [number, number, number];
+  let role: UnitRoleType;
+  let cl: CLASSES;
+
   if (specId !== null && specId > 0) {
-    const [_id, _n, _d, icon2] = GetSpecializationInfoByID(specId);
+    const [_id, _n, _d, icon2, r, className] =
+      GetSpecializationInfoByID(specId);
     specIcon = icon2;
+    const classColor = GetClassColor(className);
+    classColorOut = [classColor[0], classColor[1], classColor[2]];
+    role = r;
+    cl = className;
   } else {
     specIcon =
       "Interface\\Icons\\INV_Misc_EngGizmos_17" as unknown as FileDataId;
+    classColorOut = [1, 0, 0];
+    role = "DAMAGER";
+    cl = "WARLOCK";
   }
-  return { specIcon, tar };
+  return { specIcon, tar, classColor: classColorOut, role, class: cl };
 }
 
 // utils

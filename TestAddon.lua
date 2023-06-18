@@ -1,25 +1,37 @@
 --[[ Generated with https://github.com/TypeScriptToLua/TypeScriptToLua ]]
 local ____exports = {}
-local makeArenaTargetFrames, makeArenaTargetFrame, join, redraw, init, initOpponent, waitForFrame, forEach, find, isDrawTest, iconSize, offsetX, frames, opponents
+local ____debug, makeArenaTargetFrames, makeArenaTargetFrame, draw, join, redraw, init, initOpponent, waitForFrame, forEach, find, isDrawTest, debugging, drawMode, iconSize, iconOffsetX, frames, opponents
+function ____debug(s)
+    if debugging then
+        print(s)
+    end
+end
 function makeArenaTargetFrames(unit)
     return {
-        makeArenaTargetFrame(unit, -offsetX),
-        makeArenaTargetFrame(unit, -iconSize - offsetX * 2),
-        makeArenaTargetFrame(unit, -iconSize * 2 - offsetX * 3)
+        makeArenaTargetFrame(unit, 0),
+        makeArenaTargetFrame(unit, 1),
+        makeArenaTargetFrame(unit, 2)
     }
 end
-function makeArenaTargetFrame(unit, offsetX)
-    local f = CreateFrame("Frame")
-    f:SetWidth(iconSize)
-    f:SetHeight(iconSize)
+function makeArenaTargetFrame(unit, index)
+    local offsetX = index == 0 and -iconOffsetX or (index == 1 and -iconSize - iconOffsetX * 2 or -iconSize * 2 - iconOffsetX * 3)
+    local f = drawMode == "icon" and CreateFrame("Frame") or CreateFrame("Frame", nil, UIParent, "TooltipBorderedFrameTemplate")
     f.icon = f:CreateTexture(
         (("arena_targetter_" .. unit) .. "_") .. tostring(offsetX),
         "BACKGROUND"
     )
-    f.icon:SetWidth(iconSize)
-    f.icon:SetHeight(iconSize)
+    if drawMode == "icon" then
+        f:SetWidth(iconSize)
+        f:SetHeight(iconSize)
+        f.icon:SetWidth(iconSize)
+        f.icon:SetHeight(iconSize)
+    else
+        f:SetWidth(iconSize + 4)
+        f:SetHeight(iconSize + 4)
+        f.icon:SetWidth(iconSize)
+        f.icon:SetHeight(iconSize)
+    end
     f.icon:SetPoint("CENTER", 0, 0)
-    f.icon:SetTexture("Interface\\Icons\\INV_Misc_EngGizmos_17")
     f:Hide()
     return {
         frame = f,
@@ -30,19 +42,35 @@ function makeArenaTargetFrame(unit, offsetX)
                 frameName,
                 function(container)
                     f:SetPoint(
-                        "RIGHT",
+                        "LEFT",
                         container,
-                        "RIGHT",
-                        offsetX,
+                        "LEFT",
+                        -1 * offsetX,
                         0
                     )
                 end,
                 function()
-                    print("Stopped waiting for frame " .. frameName)
+                    ____debug("Stopped waiting for frame " .. frameName)
                 end
             )
         end
     }
+end
+function draw(f, opp)
+    local drawIcon, drawColor
+    function drawIcon()
+        local icon = opp.specIcon or "Interface\\Icons\\INV_Misc_EngGizmos_17"
+        f.frame.icon:SetTexture(icon)
+    end
+    function drawColor()
+        f.frame.icon:SetColorTexture(opp.classColor[1], opp.classColor[2], opp.classColor[3])
+    end
+    if drawMode == "icon" then
+        drawIcon()
+    else
+        drawColor()
+    end
+    f.frame:Show()
 end
 function join(tars)
     local res = ""
@@ -68,15 +96,15 @@ function redraw(unit, targetted_by)
             if not opp then
                 return
             end
-            local icon = opp.specIcon or "Interface\\Icons\\INV_Misc_EngGizmos_17"
-            fs[i + 1].frame.icon:SetTexture(icon)
-            fs[i + 1].frame:Show()
-            i = i + 1
+            if opp.role ~= "HEALER" then
+                draw(fs[i + 1], opp)
+                i = i + 1
+            end
         end
     )
 end
 function init()
-    print("Initting")
+    ____debug("Initting")
     local isArena, _ = IsActiveBattlefieldArena()
     if not isArena and not isDrawTest then
         return
@@ -102,13 +130,29 @@ end
 function initOpponent(tar)
     local specId = GetArenaOpponentSpec(tar == "arena1" and 1 or (tar == "arena2" and 2 or 3))
     local specIcon
+    local classColorOut
+    local role
+    local cl
     if specId ~= nil and specId > 0 then
-        local _id, _n, _d, icon2 = GetSpecializationInfoByID(specId)
+        local _id, _n, _d, icon2, r, className = GetSpecializationInfoByID(specId)
         specIcon = icon2
+        local classColor = {GetClassColor(className)}
+        classColorOut = {classColor[1], classColor[2], classColor[3]}
+        role = r
+        cl = className
     else
         specIcon = "Interface\\Icons\\INV_Misc_EngGizmos_17"
+        classColorOut = {1, 0, 0}
+        role = "DAMAGER"
+        cl = "WARLOCK"
     end
-    return {specIcon = specIcon, tar = tar}
+    return {
+        specIcon = specIcon,
+        tar = tar,
+        classColor = classColorOut,
+        role = role,
+        class = cl
+    }
 end
 function waitForFrame(frameName, cb, err)
     local impl, max_iter, t, i
@@ -142,17 +186,19 @@ function find(arr, cb)
     return nil
 end
 isDrawTest = false
+debugging = false
+drawMode = "color"
 local myFrame = CreateFrame("Frame")
 myFrame:HookScript(
     "OnEvent",
     function()
-        print("Setting friendly nameplate size")
+        ____debug("Setting friendly nameplate size")
         C_NamePlate.SetNamePlateFriendlySize(50, 100)
     end
 )
 myFrame:RegisterEvent("PLAYER_LOGIN")
 iconSize = 25
-offsetX = iconSize / 5
+iconOffsetX = iconSize / 5
 frames = {
     player = makeArenaTargetFrames("player"),
     party1 = makeArenaTargetFrames("party1"),
@@ -169,7 +215,7 @@ C_Timer.NewTicker(
         function checkUnit(tar)
             local target = UnitGUID(tar .. "target")
             if target ~= nil then
-                print((tar .. " is targetting ") .. target)
+                ____debug((tar .. " is targetting ") .. target)
                 forEach(
                     allUnits,
                     function(unit)
@@ -201,7 +247,7 @@ C_Timer.NewTicker(
                 local prevDigest = prevDigests[unit]
                 local digest = join(unit_being_targetted_by)
                 if prevDigest ~= digest then
-                    print((("Redrawing " .. unit) .. " - ") .. digest)
+                    ____debug((("Redrawing " .. unit) .. " - ") .. digest)
                     redraw(unit, unit_being_targetted_by)
                     prevDigests[unit] = digest
                 end
